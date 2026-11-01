@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ff8a3d">
+<title>키즈카페 종일권 본전 계산기</title>
+<style>
+  :root {
+    --bg: #fff8f1;
+    --card: #ffffff;
+    --ink: #2b2118;
+    --sub: #7a6a5c;
+    --line: #f0e2d4;
+    --hour: #3d8bff;
+    --day: #ff8a3d;
+    --win: #1fa67a;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    line-height: 1.5;
+    padding: env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom));
+  }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.35rem; margin: 8px 0 4px; }
+  .lead { color: var(--sub); font-size: .92rem; margin: 0 0 16px; }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 10px rgba(120, 80, 40, .07);
+  }
+  .card h2 { font-size: 1rem; margin: 0 0 12px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-size: .88rem; color: var(--sub); margin-bottom: 4px; }
+  .row { display: flex; gap: 10px; }
+  .row > .field { flex: 1; min-width: 0; }
+  .input {
+    display: flex; align-items: center;
+    border: 1.5px solid var(--line); border-radius: 12px;
+    background: #fffdfb; padding: 0 12px;
+  }
+  .input:focus-within { border-color: var(--day); }
+  .input input, .input select {
+    flex: 1; min-width: 0; width: 100%; border: 0; background: transparent;
+    font-size: 1.1rem; /* 16px 이상이라 iOS 에서 확대되지 않는다 */
+    padding: 12px 0; color: var(--ink); outline: none;
+    font-family: inherit;
+  }
+  .input span { color: var(--sub); font-size: .95rem; padding-left: 6px; white-space: nowrap; }
+  .stepper { display: flex; align-items: center; gap: 12px; }
+  .stepper button {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 0; background: #ffe7d4; color: var(--day);
+    font-size: 1.5rem; font-weight: 700; cursor: pointer;
+    touch-action: manipulation;
+  }
+  .stepper button:active { transform: scale(.94); }
+  .stepper output { font-size: 1.4rem; font-weight: 700; min-width: 3.5em; text-align: center; }
+
+  .result { text-align: center; padding: 20px 16px; }
+  .verdict { font-size: 1.3rem; font-weight: 800; margin: 0 0 4px; }
+  .verdict.hour { color: var(--hour); }
+  .verdict.day { color: var(--day); }
+  .verdict.same { color: var(--win); }
+  .save { color: var(--sub); margin: 0 0 14px; }
+  .compare { display: flex; gap: 10px; }
+  .compare > div {
+    flex: 1; border-radius: 12px; padding: 12px 8px;
+    border: 2px solid var(--line);
+  }
+  .compare .win { border-color: var(--win); background: #effaf5; }
+  .compare small { display: block; color: var(--sub); font-size: .82rem; }
+  .compare b { font-size: 1.2rem; }
+  .compare .detail { font-size: .78rem; color: var(--sub); margin-top: 2px; }
+
+  .breakeven {
+    background: #fff3e8; border-radius: 12px; padding: 14px;
+    font-size: 1rem; margin-top: 14px; text-align: left;
+  }
+  .breakeven strong { color: var(--day); font-size: 1.15rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { padding: 8px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--sub); font-weight: 600; font-size: .82rem; }
+  tr.now td { background: #fff3e8; font-weight: 700; }
+  td.cheap { color: var(--win); font-weight: 700; }
+  .bar { height: 6px; border-radius: 3px; background: var(--hour); margin-top: 3px; }
+  .note { color: var(--sub); font-size: .8rem; margin: 10px 0 0; }
+  .err { color: #d6453d; font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎈 키즈카페 종일권 본전 계산기</h1>
+  <p class="lead">시간권과 종일권, 오늘은 어느 쪽이 쌀까요? 요금표를 보고 숫자만 넣어 주세요.</p>
+
+  <section class="card">
+    <h2><span class="dot" style="background:var(--hour)"></span>시간권 요금 <small style="color:var(--sub);font-weight:400">(아이 1명)</small></h2>
+    <div class="row">
+      <div class="field">
+        <label for="baseHours">기본 시간</label>
+        <div class="input">
+          <select id="baseHours">
+            <option value="0.5">30분</option>
+            <option value="1" selected>1시간</option>
+            <option value="1.5">1시간 30분</option>
+            <option value="2">2시간</option>
+            <option value="2.5">2시간 30분</option>
+            <option value="3">3시간</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="baseFee">기본 요금</label>
+        <div class="input"><input id="baseFee" type="number" inputmode="numeric" min="0" step="500" value="12000"><span>원</span></div>
+      </div>
+    </div>
+    <div class="field">
+      <label for="extraFee">30분 추가 요금</label>
+      <div class="input"><input id="extraFee" type="number" inputmode="numeric" min="0" step="500" value="4000"><span>원</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="dot" style="background:var(--day)"></span>종일권 요금 <small style="color:var(--sub);font-weight:400">(아이 1명)</small></h2>
+    <div class="field">
+      <div class="input"><input id="dayFee" type="number" inputmode="numeric" min="0" step="500" value="28000" aria-label="종일권 요금"><span>원</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>👧 아이 수와 머무를 시간</h2>
+    <div class="field">
+      <label>아이 수</label>
+      <div class="stepper">
+        <button type="button" id="kidMinus" aria-label="아이 한 명 빼기">−</button>
+        <output id="kids">1명</output>
+        <button type="button" id="kidPlus" aria-label="아이 한 명 더하기">+</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="stayH">머무를 시간</label>
+        <div class="input"><select id="stayH"></select><span>시간</span></div>
+      </div>
+      <div class="field">
+        <label for="stayM">&nbsp;</label>
+        <div class="input"><select id="stayM"></select><span>분</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card result" id="result" aria-live="polite"></section>
+
+  <section class="card">
+    <h2>⏱ 시간대별 요금 비교 <small style="color:var(--sub);font-weight:400" id="tableKids"></small></h2>
+    <table>
+      <thead><tr><th>머문 시간</th><th>시간권</th><th>종일권</th></tr></thead>
+      <tbody id="table"></tbody>
+    </table>
+    <p class="note">추가 요금은 30분 단위로 올림해서 계산합니다(예: 기본 1시간에 1시간 10분 머물면 30분 2번 추가). 가게마다 계산 방식이 다를 수 있으니 카운터에서 한 번 확인해 주세요.</p>
+  </section>
+</div>
+
+<script>
+  // 입력 요소 모음
+  const $ = (id) => document.getElementById(id);
+  const won = (n) => n.toLocaleString('ko-KR') + '원';
+  const STORE_KEY = 'kidscafe-pass-v1';
+  let kids = 1;
+
+  // 머무를 시간 선택지 채우기 (0~12시간, 10분 단위)
+  for (let h = 0; h <= 12; h++) $('stayH').add(new Option(h, h, false, h === 3));
+  for (let m = 0; m < 60; m += 10) $('stayM').add(new Option(m, m));
+
+  // 분을 "2시간 30분" 꼴로 바꾼다
+  function fmtTime(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    if (h && m) return `${h}시간 ${m}분`;
+    if (h) return `${h}시간`;
+    return `${m}분`;
+  }
+
+  // 아이 1명 기준 시간권 요금. 기본 시간을 넘긴 부분은 30분 단위 올림.
+  function hourlyCost(stayMin, p) {
+    const over = Math.max(0, stayMin - p.baseMin);
+    return p.baseFee + Math.ceil(over / 30) * p.extraFee;
+  }
+
+  function readInputs() {
+    return {
+      baseMin: Math.round(parseFloat($('baseHours').value) * 60),
+      baseFee: Math.max(0, Number($('baseFee').value) || 0),
+      extraFee: Math.max(0, Number($('extraFee').value) || 0),
+      dayFee: Math.max(0, Number($('dayFee').value) || 0),
+      stayMin: Number($('stayH').value) * 60 + Number($('stayM').value),
+    };
+  }
+
+  // 손익분기점 계산. 시간권이 종일권보다 비싸지기 시작하는 시점을 찾는다.
+  function breakeven(p) {
+    if (p.baseFee > p.dayFee) return { type: 'always' };          // 처음부터 종일권이 쌈
+    if (p.extraFee === 0) return { type: 'never' };                // 추가 요금이 없으면 시간권이 계속 쌈
+    // 추가 30분을 k번 했을 때 종일권보다 비싸지는 가장 작은 k
+    const k = Math.floor((p.dayFee - p.baseFee) / p.extraFee) + 1;
+    // k번째 추가가 붙는 순간 = 기본 시간 + (k-1)*30분 을 넘기는 순간
+    const overMin = p.baseMin + (k - 1) * 30;
+    // 요금이 딱 같아지는 구간이 있는지
+    const equalK = (p.dayFee - p.baseFee) / p.extraFee;
+    const equal = Number.isInteger(equalK) && equalK >= 1;
+    return { type: 'at', overMin, equal, equalFrom: equal ? p.baseMin + (equalK - 1) * 30 : null };
+  }
+
+  function render() {
+    const p = readInputs();
+    const hour1 = hourlyCost(p.stayMin, p);
+    const hourAll = hour1 * kids, dayAll = p.dayFee * kids;
+    const diff = Math.abs(hourAll - dayAll);
+    const be = breakeven(p);
+
+    let verdict, cls, save;
+    if (p.stayMin === 0) {
+      verdict = '머무를 시간을 넣어 주세요'; cls = ''; save = '';
+    } else if (hourAll < dayAll) {
+      verdict = '⏱ 시간권이 더 싸요'; cls = 'hour'; save = `${won(diff)} 아낄 수 있어요`;
+    } else if (hourAll > dayAll) {
+      verdict = '🎟 종일권이 더 싸요'; cls = 'day'; save = `${won(diff)} 아낄 수 있어요`;
+    } else {
+      verdict = '🤝 두 요금이 똑같아요'; cls = 'same'; save = '더 놀 수 있는 종일권을 추천해요';
+    }
+
+    const extraCount = Math.ceil(Math.max(0, p.stayMin - p.baseMin) / 30);
+    const hourDetail = extraCount
+      ? `기본 ${won(p.baseFee)} + 30분×${extraCount}`
+      : `기본 ${fmtTime(p.baseMin)} 안`;
+
+    let beText;
+    if (be.type === 'always') {
+      beText = `기본 요금이 종일권보다 비싸서 <strong>몇 분을 있든 종일권</strong>이 이득이에요.`;
+    } else if (be.type === 'never') {
+      beText = `30분 추가 요금이 0원이라 <strong>시간권이 계속 이득</strong>이에요.`;
+    } else {
+      beText = `<strong>${fmtTime(be.overMin)}</strong>을 넘겨 머물면 종일권이 이득이에요.`;
+      if (be.equal) {
+        beText += `<br><small style="color:var(--sub)">${fmtTime(be.equalFrom)} 초과 ~ ${fmtTime(be.overMin)}까지는 두 요금이 같아요.</small>`;
+      }
+      if (be.overMin > 12 * 60) {
+        beText += `<br><small style="color:var(--sub)">보통 하루 안에 그만큼 머물기 어려우니 시간권이 유리할 가능성이 커요.</small>`;
+      }
+    }
+
+    $('result').innerHTML = `
+      <p class="verdict ${cls}">${verdict}</p>
+      <p class="save">${save}</p>
+      <div class="compare">
+        <div class="${hourAll < dayAll ? 'win' : ''}">
+          <small>시간권 · ${kids}명 · ${fmtTime(p.stayMin)}</small>
+          <b>${won(hourAll)}</b>
+          <div class="detail">${hourDetail}${kids > 1 ? ` (1명 ${won(hour1)})` : ''}</div>
+        </div>
+        <div class="${dayAll < hourAll || (dayAll === hourAll && p.stayMin) ? 'win' : ''}">
+          <small>종일권 · ${kids}명</small>
+          <b>${won(dayAll)}</b>
+          <div class="detail">${kids > 1 ? `1명 ${won(p.dayFee)}` : '시간 제한 없음'}</div>
+        </div>
+      </div>
+      <div class="breakeven">💡 ${beText}</div>`;
+
+    // 30분 단위 비교표 (최대 8시간, 지금 머무를 시간이 더 길면 거기까지)
+    const maxMin = Math.max(8 * 60, Math.ceil(p.stayMin / 30) * 30);
+    const maxCost = Math.max(hourlyCost(maxMin, p), p.dayFee) * kids || 1;
+    const nowSlot = Math.ceil(p.stayMin / 30) * 30;
+    let rows = '';
+    for (let t = 30; t <= maxMin; t += 30) {
+      const h = hourlyCost(t, p) * kids;
+      const hourCheap = h < dayAll, dayCheap = dayAll < h;
+      rows += `<tr class="${t === nowSlot ? 'now' : ''}">
+        <td>${fmtTime(t)}${t === nowSlot ? ' 👈' : ''}</td>
+        <td class="${hourCheap ? 'cheap' : ''}">${won(h)}<div class="bar" style="width:${(h / maxCost) * 100}%"></div></td>
+        <td class="${dayCheap ? 'cheap' : ''}">${won(dayAll)}<div class="bar" style="width:${(dayAll / maxCost) * 100}%;background:var(--day)"></div></td>
+      </tr>`;
+    }
+    $('table').innerHTML = rows;
+    $('tableKids').textContent = `(아이 ${kids}명 합계)`;
+    $('kids').textContent = `${kids}명`;
+    $('kidMinus').disabled = kids <= 1;
+
+    save_();
+  }
+
+  // 마지막으로 넣은 요금을 폰에 기억해 둔다
+  function save_() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        baseHours: $('baseHours').value, baseFee: $('baseFee').value,
+        extraFee: $('extraFee').value, dayFee: $('dayFee').value,
+        stayH: $('stayH').value, stayM: $('stayM').value, kids,
+      }));
+    } catch (e) { /* 사생활 보호 모드 등에서는 저장하지 않는다 */ }
+  }
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      if (!s) return;
+      ['baseHours', 'baseFee', 'extraFee', 'dayFee', 'stayH', 'stayM'].forEach((k) => {
+        if (s[k] != null) $(k).value = s[k];
+      });
+      if (s.kids >= 1) kids = s.kids;
+    } catch (e) { /* 저장값이 깨졌으면 기본값으로 시작 */ }
+  }
+
+  $('kidMinus').addEventListener('click', () => { if (kids > 1) { kids--; render(); } });
+  $('kidPlus').addEventListener('click', () => { if (kids < 10) { kids++; render(); } });
+  ['baseHours', 'baseFee', 'extraFee', 'dayFee', 'stayH', 'stayM'].forEach((id) => {
+    $(id).addEventListener('input', render);
+    $(id).addEventListener('change', render);
+  });
+
+  load();
+  render();
+</script>
+</body>
+</html>
