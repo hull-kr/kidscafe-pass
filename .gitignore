@@ -1,0 +1,30 @@
+# 비밀 값 · 환경 설정
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS 가 만드는 파일
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 편집기 설정
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+
+# 로그 · 임시 파일
+*.log
+*.tmp
+*.bak
+
+# 혹시 쓰게 될 도구가 만드는 폴더
+node_modules/
+dist/
+.cache/
