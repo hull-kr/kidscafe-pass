@@ -89,6 +89,19 @@
   }
   .breakeven strong { color: var(--day); font-size: 1.15rem; }
 
+  /* 결과 복사 버튼 - 카톡 노란색 */
+  .copy {
+    display: block; width: 100%; margin-top: 14px;
+    padding: 14px; border: 0; border-radius: 12px;
+    background: #fee500; color: #3c1e1e;
+    font-size: 1.05rem; font-weight: 700; font-family: inherit;
+    cursor: pointer; touch-action: manipulation;
+  }
+  .copy:active { transform: scale(.98); }
+  .copy:disabled { opacity: .45; cursor: default; transform: none; }
+  .copy.done { background: var(--win); color: #fff; }
+  .copy-msg { color: var(--sub); font-size: .85rem; margin: 6px 0 0; min-height: 1.3em; }
+
   table { width: 100%; border-collapse: collapse; font-size: .9rem; }
   th, td { padding: 8px 4px; text-align: right; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
@@ -161,7 +174,11 @@
     </div>
   </section>
 
-  <section class="card result" id="result" aria-live="polite"></section>
+  <section class="card result">
+    <div id="result" aria-live="polite"></div>
+    <button type="button" class="copy" id="copyBtn">📋 결과 복사</button>
+    <p class="copy-msg" id="copyMsg" aria-live="polite"></p>
+  </section>
 
   <section class="card">
     <h2>⏱ 시간대별 요금 비교 <small style="color:var(--sub);font-weight:400" id="tableKids"></small></h2>
@@ -179,6 +196,7 @@
   const won = (n) => n.toLocaleString('ko-KR') + '원';
   const STORE_KEY = 'kidscafe-pass-v1';
   let kids = 1;
+  let shareText = '';   // 결과 복사 버튼이 복사할 글 (render 에서 채운다)
 
   // 머무를 시간 선택지 채우기 (0~12시간, 10분 단위)
   for (let h = 0; h <= 12; h++) $('stayH').add(new Option(h, h, false, h === 3));
@@ -245,13 +263,16 @@
       ? `기본 ${won(p.baseFee)} + 30분×${extraCount}`
       : `기본 ${fmtTime(p.baseMin)} 안`;
 
-    let beText;
+    let beText, bePlain;
     if (be.type === 'always') {
       beText = `기본 요금이 종일권보다 비싸서 <strong>몇 분을 있든 종일권</strong>이 이득이에요.`;
+      bePlain = '기본 요금이 종일권보다 비싸서 몇 분을 있든 종일권이 이득이에요.';
     } else if (be.type === 'never') {
       beText = `30분 추가 요금이 0원이라 <strong>시간권이 계속 이득</strong>이에요.`;
+      bePlain = '30분 추가 요금이 0원이라 시간권이 계속 이득이에요.';
     } else {
       beText = `<strong>${fmtTime(be.overMin)}</strong>을 넘겨 머물면 종일권이 이득이에요.`;
+      bePlain = `${fmtTime(be.overMin)}을 넘겨 머물면 종일권이 이득이에요.`;
       if (be.equal) {
         beText += `<br><small style="color:var(--sub)">${fmtTime(be.equalFrom)} 초과 ~ ${fmtTime(be.overMin)}까지는 두 요금이 같아요.</small>`;
       }
@@ -276,6 +297,19 @@
         </div>
       </div>
       <div class="breakeven">💡 ${beText}</div>`;
+
+    // 카톡에 붙여 넣을 글. 서식이 안 먹으니 줄바꿈과 이모지로만 나눈다.
+    shareText = p.stayMin === 0 ? '' : [
+      '🎈 키즈카페 요금 비교',
+      `👧 아이 ${kids}명 · ${fmtTime(p.stayMin)} 머물 예정`,
+      '',
+      `⏱ 시간권 ${won(hourAll)} (${hourDetail}${kids > 1 ? `, 1명 ${won(hour1)}` : ''})`,
+      `🎟 종일권 ${won(dayAll)}${kids > 1 ? ` (1명 ${won(p.dayFee)})` : ''}`,
+      '',
+      `👉 ${verdict.replace(/^\S+\s/, '')}${save ? ` - ${save}` : ''}`,
+      `💡 ${bePlain}`,
+    ].join('\n');
+    $('copyBtn').disabled = !shareText;
 
     // 30분 단위 비교표 (최대 8시간, 지금 머무를 시간이 더 길면 거기까지)
     const maxMin = Math.max(8 * 60, Math.ceil(p.stayMin / 30) * 30);
@@ -325,6 +359,47 @@
   ['baseHours', 'baseFee', 'extraFee', 'dayFee', 'stayH', 'stayM'].forEach((id) => {
     $(id).addEventListener('input', render);
     $(id).addEventListener('change', render);
+  });
+
+  // 클립보드 복사. navigator.clipboard 가 막힌 환경(오래된 브라우저, http 주소 등)은 예전 방식으로 한다.
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* 아래 예전 방식으로 넘어간다 */ }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);   // iOS 사파리는 이게 있어야 전체가 잡힌다
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+
+  let copyTimer;
+  $('copyBtn').addEventListener('click', async () => {
+    if (!shareText) return;
+    const ok = await copyText(shareText);
+    const btn = $('copyBtn');
+    clearTimeout(copyTimer);
+    if (ok) {
+      btn.textContent = '✅ 복사했어요';
+      btn.classList.add('done');
+      $('copyMsg').textContent = '카톡 대화창에 길게 눌러 붙여 넣으세요.';
+    } else {
+      $('copyMsg').textContent = '복사가 막혀 있어요. 화면의 결과를 길게 눌러 직접 복사해 주세요.';
+    }
+    copyTimer = setTimeout(() => {
+      btn.textContent = '📋 결과 복사';
+      btn.classList.remove('done');
+      $('copyMsg').textContent = '';
+    }, 2500);
   });
 
   load();
