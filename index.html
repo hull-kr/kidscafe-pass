@@ -5,6 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ff8a3d">
 <title>키즈카페 종일권 본전 계산기</title>
+<script>
+  // 화면 테마. 'auto' 는 폰 설정(다크 모드 여부)을 따른다.
+  // 본문이 그려지기 전에 걸어야 밤에 하얀 화면이 번쩍이지 않는다.
+  const THEME_KEY = 'kidscafe-pass-theme';
+  const darkMq = window.matchMedia('(prefers-color-scheme: dark)');
+  let themePref = 'auto';
+  try { themePref = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) { /* 저장이 막힌 환경은 자동으로 */ }
+  function setTheme(pref) {
+    themePref = pref;
+    try { localStorage.setItem(THEME_KEY, pref); } catch (e) { /* 저장이 막혀도 이번 화면에는 적용한다 */ }
+    applyTheme();
+  }
+  function applyTheme() {
+    const dark = themePref === 'dark' || (themePref !== 'light' && darkMq.matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    // 주소창 색도 맞춘다. 다크에서 주황 주소창은 눈부시다.
+    document.querySelector('meta[name="theme-color"]').content = dark ? '#17130f' : '#ff8a3d';
+  }
+  applyTheme();
+  darkMq.addEventListener && darkMq.addEventListener('change', applyTheme);
+</script>
 <style>
   :root {
     --bg: #fff8f1;
@@ -15,8 +36,44 @@
     --hour: #3d8bff;
     --day: #ff8a3d;
     --win: #1fa67a;
+    --on-win: #ffffff;     /* 초록 바탕 위 글자 */
+    --field: #fffdfb;      /* 입력칸 바탕 */
+    --soft: #ffe7d4;       /* 아이 수 +/- 버튼 바탕 */
+    --win-bg: #effaf5;     /* 이기는 쪽 카드 바탕 */
+    --hl: #fff3e8;         /* 손익분기 상자, 비교표의 지금 줄 */
+    --shadow: rgba(120, 80, 40, .07);
+    --err: #d6453d;
     --radius: 16px;
+    color-scheme: light;
   }
+  /* 다크 모드 - 밤에 눈부시지 않게 바탕을 어둡게, 강조색은 조금 밝게 */
+  :root[data-theme="dark"] {
+    --bg: #17130f;
+    --card: #231d18;
+    --ink: #f1e7dc;
+    --sub: #b2a395;
+    --line: #3b322a;
+    --hour: #6fa9ff;
+    --day: #ff9d5a;
+    --win: #3cc492;
+    --on-win: #0e2a1f;
+    --field: #1c1713;
+    --soft: #3a2a1d;
+    --win-bg: #15302a;
+    --hl: #322419;
+    --shadow: rgba(0, 0, 0, .35);
+    --err: #ff7b70;
+    color-scheme: dark;
+  }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .theme {
+    flex: none; margin-top: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    border: 1.5px solid var(--line); background: var(--card); color: var(--ink);
+    font-size: .85rem; font-family: inherit; cursor: pointer;
+    touch-action: manipulation; white-space: nowrap;
+  }
+  .theme:active { transform: scale(.96); }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
@@ -28,14 +85,14 @@
     padding: env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom));
   }
   .wrap { max-width: 520px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 1.35rem; margin: 8px 0 4px; }
+  h1 { font-size: 1.35rem; margin: 8px 0 4px; word-break: keep-all; }
   .lead { color: var(--sub); font-size: .92rem; margin: 0 0 16px; }
   .card {
     background: var(--card);
     border-radius: var(--radius);
     padding: 16px;
     margin-bottom: 14px;
-    box-shadow: 0 2px 10px rgba(120, 80, 40, .07);
+    box-shadow: 0 2px 10px var(--shadow);
   }
   .card h2 { font-size: 1rem; margin: 0 0 12px; display: flex; align-items: center; gap: 6px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -47,7 +104,7 @@
   .input {
     display: flex; align-items: center;
     border: 1.5px solid var(--line); border-radius: 12px;
-    background: #fffdfb; padding: 0 12px;
+    background: var(--field); padding: 0 12px;
   }
   .input:focus-within { border-color: var(--day); }
   .input input, .input select {
@@ -60,7 +117,7 @@
   .stepper { display: flex; align-items: center; gap: 12px; }
   .stepper button {
     width: 48px; height: 48px; border-radius: 50%;
-    border: 0; background: #ffe7d4; color: var(--day);
+    border: 0; background: var(--soft); color: var(--day);
     font-size: 1.5rem; font-weight: 700; cursor: pointer;
     touch-action: manipulation;
   }
@@ -78,13 +135,13 @@
     flex: 1; border-radius: 12px; padding: 12px 8px;
     border: 2px solid var(--line);
   }
-  .compare .win { border-color: var(--win); background: #effaf5; }
+  .compare .win { border-color: var(--win); background: var(--win-bg); }
   .compare small { display: block; color: var(--sub); font-size: .82rem; }
   .compare b { font-size: 1.2rem; }
   .compare .detail { font-size: .78rem; color: var(--sub); margin-top: 2px; }
 
   .breakeven {
-    background: #fff3e8; border-radius: 12px; padding: 14px;
+    background: var(--hl); border-radius: 12px; padding: 14px;
     font-size: 1rem; margin-top: 14px; text-align: left;
   }
   .breakeven strong { color: var(--day); font-size: 1.15rem; }
@@ -99,23 +156,28 @@
   }
   .copy:active { transform: scale(.98); }
   .copy:disabled { opacity: .45; cursor: default; transform: none; }
-  .copy.done { background: var(--win); color: #fff; }
+  .copy.done { background: var(--win); color: var(--on-win); }
+  /* 다크에서는 카톡 노랑이 너무 튀어서 밝기만 조금 낮춘다 */
+  :root[data-theme="dark"] .copy:not(.done) { filter: brightness(.85); }
   .copy-msg { color: var(--sub); font-size: .85rem; margin: 6px 0 0; min-height: 1.3em; }
 
   table { width: 100%; border-collapse: collapse; font-size: .9rem; }
   th, td { padding: 8px 4px; text-align: right; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
   th { color: var(--sub); font-weight: 600; font-size: .82rem; }
-  tr.now td { background: #fff3e8; font-weight: 700; }
+  tr.now td { background: var(--hl); font-weight: 700; }
   td.cheap { color: var(--win); font-weight: 700; }
   .bar { height: 6px; border-radius: 3px; background: var(--hour); margin-top: 3px; }
   .note { color: var(--sub); font-size: .8rem; margin: 10px 0 0; }
-  .err { color: #d6453d; font-size: .9rem; }
+  .err { color: var(--err); font-size: .9rem; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🎈 키즈카페 종일권 본전 계산기</h1>
+  <div class="top">
+    <h1>🎈 키즈카페 종일권 본전 계산기</h1>
+    <button type="button" class="theme" id="themeBtn"></button>
+  </div>
   <p class="lead">시간권과 종일권, 오늘은 어느 쪽이 쌀까요? 요금표를 보고 숫자만 넣어 주세요.</p>
 
   <section class="card">
@@ -402,6 +464,21 @@
     }, 2500);
   });
 
+  // 테마 버튼: 누를 때마다 자동 → 밝게 → 어둡게 순으로 바뀐다
+  const THEMES = { auto: '🌓 자동', light: '☀️ 밝게', dark: '🌙 어둡게' };
+  const NEXT_THEME = { auto: 'light', light: 'dark', dark: 'auto' };
+  const THEME_NAMES = { auto: '자동', light: '밝게', dark: '어둡게' };
+  function renderThemeBtn() {
+    const pref = THEMES[themePref] ? themePref : 'auto';
+    $('themeBtn').textContent = THEMES[pref];
+    $('themeBtn').setAttribute('aria-label', `화면 테마 ${THEME_NAMES[pref]}, 눌러서 바꾸기`);
+  }
+  $('themeBtn').addEventListener('click', () => {
+    setTheme(NEXT_THEME[themePref] || 'light');
+    renderThemeBtn();
+  });
+
+  renderThemeBtn();
   load();
   render();
 </script>
